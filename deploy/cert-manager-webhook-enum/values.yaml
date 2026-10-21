@@ -1,0 +1,47 @@
+# groupName is the API group the webhook registers under. It is chosen by the
+# webhook author (a domain enum owns) and does not need adjusting by users. It
+# must be referenced in each Issuer's `webhook` stanza so cert-manager knows
+# where to send the DNS01 ChallengePayload.
+groupName: acme.enum.co
+
+# The cert-manager installation this webhook serves. The cert-manager
+# ServiceAccount is granted permission to invoke the solver API group.
+certManager:
+  namespace: cert-manager
+  serviceAccountName: cert-manager
+
+image:
+  repository: registry.enum.cloud/enum/cert-manager-webhook-enum
+  tag: "" # defaults to the chart appVersion
+  pullPolicy: IfNotPresent
+
+# secretNames restricts (via RBAC resourceNames) which Secrets the webhook may
+# read for the enum API token. Add the name of the Secret your Issuer references
+# in `apiTokenSecretRef`. Empty grants read on all Secrets cluster-wide.
+secretNames:
+  - enum-api-token
+
+# securePort is the port the webhook's extension apiserver listens on. It is
+# above 1024 so the container can run as an unprivileged user.
+securePort: 6443
+
+replicaCount: 1
+
+nameOverride: ""
+fullnameOverride: ""
+
+service:
+  type: ClusterIP
+  port: 443
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 200m
+    memory: 128Mi
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

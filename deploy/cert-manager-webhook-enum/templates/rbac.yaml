@@ -1,0 +1,146 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "cert-manager-webhook-enum.fullname" . }}
+  namespace: {{ .Release.Namespace | quote }}
+  labels:
+    {{- include "cert-manager-webhook-enum.labels" . | nindent 4 }}
+---
+# Allow the webhook to read the enum API-token Secret referenced by an Issuer.
+# cert-manager resolves that Secret in the challenge's resource namespace (the
+# cluster resource namespace for a ClusterIssuer, the Issuer's namespace for an
+# Issuer), so this is cluster-scoped, restricted to the named Secret(s).
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "cert-manager-webhook-enum.fullname" . }}:secret-reader
+  labels:
+    {{- include "cert-manager-webhook-enum.labels" . | nindent 4 }}
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - secrets
+    {{- with .Values.secretNames }}
+    resourceNames:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+    verbs:
+      - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "cert-manager-webhook-enum.fullname" . }}:secret-reader
+  labels:
+    {{- include "cert-manager-webhook-enum.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ include "cert-manager-webhook-enum.fullname" . }}:secret-reader
+subjects:
+  - apiGroup: ""
+    kind: ServiceAccount
+    name: {{ include "cert-manager-webhook-enum.fullname" . }}
+    namespace: {{ .Release.Namespace }}
+---
+# Grant the webhook's apiserver read of the requestheader CA ConfigMap in
+# kube-system, required for extension apiserver authentication.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "cert-manager-webhook-enum.fullname" . }}:webhook-authentication-reader
+  namespace: kube-system
+  labels:
+    {{- include "cert-manager-webhook-enum.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: extension-apiserver-authentication-reader
+subjects:
+  - apiGroup: ""
+    kind: ServiceAccount
+    name: {{ include "cert-manager-webhook-enum.fullname" . }}
+    namespace: {{ .Release.Namespace }}
+---
+# Delegate authn/authz decisions to the core apiserver.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "cert-manager-webhook-enum.fullname" . }}:auth-delegator
+  labels:
+    {{- include "cert-manager-webhook-enum.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:auth-delegator
+subjects:
+  - apiGroup: ""
+    kind: ServiceAccount
+    name: {{ include "cert-manager-webhook-enum.fullname" . }}
+    namespace: {{ .Release.Namespace }}
+---
+# Allow the extension apiserver to read API Priority & Fairness config.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "cert-manager-webhook-enum.fullname" . }}:flowcontrol
+  labels:
+    {{- include "cert-manager-webhook-enum.labels" . | nindent 4 }}
+rules:
+  - apiGroups:
+      - flowcontrol.apiserver.k8s.io
+    resources:
+      - prioritylevelconfigurations
+      - flowschemas
+    verbs:
+      - get
+      - list
+      - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "cert-manager-webhook-enum.fullname" . }}:flowcontrol
+  labels:
+    {{- include "cert-manager-webhook-enum.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ include "cert-manager-webhook-enum.fullname" . }}:flowcontrol
+subjects:
+  - apiGroup: ""
+    kind: ServiceAccount
+    name: {{ include "cert-manager-webhook-enum.fullname" . }}
+    namespace: {{ .Release.Namespace }}
+---
+# Grant cert-manager permission to invoke the solver via our apiserver.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "cert-manager-webhook-enum.fullname" . }}:domain-solver
+  labels:
+    {{- include "cert-manager-webhook-enum.labels" . | nindent 4 }}
+rules:
+  - apiGroups:
+      - {{ .Values.groupName }}
+    resources:
+      - '*'
+    verbs:
+      - create
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "cert-manager-webhook-enum.fullname" . }}:domain-solver
+  labels:
+    {{- include "cert-manager-webhook-enum.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ include "cert-manager-webhook-enum.fullname" . }}:domain-solver
+subjects:
+  - apiGroup: ""
+    kind: ServiceAccount
+    name: {{ .Values.certManager.serviceAccountName }}
+    namespace: {{ .Values.certManager.namespace }}

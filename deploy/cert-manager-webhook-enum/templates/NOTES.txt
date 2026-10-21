@@ -1,0 +1,39 @@
+{{ .Chart.Name }} is installed.
+
+The webhook serves the DNS-01 solver API group "{{ .Values.groupName }}"
+(solver name "enum").
+
+Next steps:
+
+1. Create a Secret with a project-scoped enum API token in the namespace where
+   cert-manager resolves Issuer credentials (the cluster resource namespace for
+   a ClusterIssuer, default "{{ .Values.certManager.namespace }}"):
+
+     kubectl -n {{ .Values.certManager.namespace }} create secret generic {{ index .Values.secretNames 0 | default "enum-api-token" }} \
+       --from-literal=token=<YOUR_ENUM_API_TOKEN>
+
+2. Reference the solver in a ClusterIssuer:
+
+     apiVersion: cert-manager.io/v1
+     kind: ClusterIssuer
+     metadata:
+       name: enum-letsencrypt
+     spec:
+       acme:
+         server: https://acme-v02.api.letsencrypt.org/directory
+         email: you@example.com
+         privateKeySecretRef:
+           name: enum-letsencrypt-account-key
+         solvers:
+           - dns01:
+               webhook:
+                 groupName: {{ .Values.groupName }}
+                 solverName: enum
+                 config:
+                   projectId: <YOUR_ENUM_PROJECT_ID>
+                   apiTokenSecretRef:
+                     name: {{ index .Values.secretNames 0 | default "enum-api-token" }}
+                     key: token
+
+The target enum DNS zone must already be active (delegated) for challenges to
+validate.

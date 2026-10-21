@@ -1,0 +1,58 @@
+---
+# Self-signed Issuer used to mint a root CA for the webhook's serving cert.
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: {{ include "cert-manager-webhook-enum.selfSignedIssuer" . }}
+  namespace: {{ .Release.Namespace | quote }}
+  labels:
+    {{- include "cert-manager-webhook-enum.labels" . | nindent 4 }}
+spec:
+  selfSigned: {}
+---
+# Root CA certificate used to sign the webhook serving certificate.
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ include "cert-manager-webhook-enum.rootCACertificate" . }}
+  namespace: {{ .Release.Namespace | quote }}
+  labels:
+    {{- include "cert-manager-webhook-enum.labels" . | nindent 4 }}
+spec:
+  secretName: {{ include "cert-manager-webhook-enum.rootCACertificate" . }}
+  duration: 43800h # 5y
+  issuerRef:
+    name: {{ include "cert-manager-webhook-enum.selfSignedIssuer" . }}
+  commonName: "ca.cert-manager-webhook-enum.cert-manager"
+  isCA: true
+---
+# Issuer backed by the root CA above.
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: {{ include "cert-manager-webhook-enum.rootCAIssuer" . }}
+  namespace: {{ .Release.Namespace | quote }}
+  labels:
+    {{- include "cert-manager-webhook-enum.labels" . | nindent 4 }}
+spec:
+  ca:
+    secretName: {{ include "cert-manager-webhook-enum.rootCACertificate" . }}
+---
+# Serving certificate for the webhook. Its CA is injected into the APIService
+# caBundle via the cert-manager.io/inject-ca-from annotation.
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ include "cert-manager-webhook-enum.servingCertificate" . }}
+  namespace: {{ .Release.Namespace | quote }}
+  labels:
+    {{- include "cert-manager-webhook-enum.labels" . | nindent 4 }}
+spec:
+  secretName: {{ include "cert-manager-webhook-enum.servingCertificate" . }}
+  duration: 8760h # 1y
+  issuerRef:
+    name: {{ include "cert-manager-webhook-enum.rootCAIssuer" . }}
+  dnsNames:
+    - {{ include "cert-manager-webhook-enum.fullname" . }}
+    - {{ include "cert-manager-webhook-enum.fullname" . }}.{{ .Release.Namespace }}
+    - {{ include "cert-manager-webhook-enum.fullname" . }}.{{ .Release.Namespace }}.svc

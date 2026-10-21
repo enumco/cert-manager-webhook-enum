@@ -1,0 +1,7 @@
+# Built binary (matches `go build .` output and the dir-named `go build ./...` output)
+/webhook
+/cert-manager-webhook
+
+# Test/tool output
+/_out/
+/bin/
